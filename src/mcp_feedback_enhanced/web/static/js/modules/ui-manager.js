@@ -24,6 +24,10 @@
         this.layoutMode = options.layoutMode || 'combined-vertical';
         this.lastSubmissionTime = null;
         
+        // 上次反馈预览
+        this.lastFeedbackData = null;
+        this.lastFeedbackCollapsed = false;
+        
         // UI 元素
         this.connectionIndicator = null;
         this.connectionText = null;
@@ -75,6 +79,10 @@
 
         // 回饋相關元素
         this.submitBtn = Utils.safeQuerySelector('#submitBtn');
+        
+        // 上次反馈预览元素
+        this.lastFeedbackPreview = Utils.safeQuerySelector('#lastFeedbackPreview');
+        this.lastFeedbackContent = Utils.safeQuerySelector('#lastFeedbackContent');
 
         console.log('✅ UI 元素初始化完成');
     };
@@ -557,6 +565,157 @@
     UIManager.prototype.setLastSubmissionTime = function(timestamp) {
         this.lastSubmissionTime = timestamp;
         this.updateStatusIndicator();
+    };
+
+    /**
+     * 显示上次反馈预览
+     * @param {Object} feedbackData - 反馈数据 { feedback: string, images: array }
+     */
+    UIManager.prototype.showLastFeedback = function(feedbackData) {
+        if (!feedbackData || (!feedbackData.feedback && (!feedbackData.images || feedbackData.images.length === 0))) {
+            this.hideLastFeedback();
+            return;
+        }
+
+        this.lastFeedbackData = feedbackData;
+        
+        var preview = Utils.safeQuerySelector('#lastFeedbackPreview');
+        var content = Utils.safeQuerySelector('#lastFeedbackContent');
+        
+        if (!preview || !content) {
+            console.warn('⚠️ 找不到上次反馈预览元素');
+            return;
+        }
+        
+        // 构建内容 HTML
+        var html = '';
+        
+        // 文字内容
+        if (feedbackData.feedback) {
+            html += '<div class="last-feedback-text">' + this.escapeHtml(feedbackData.feedback) + '</div>';
+        }
+        
+        // 图片指示器
+        if (feedbackData.images && feedbackData.images.length > 0) {
+            var imagesText = window.i18nManager ? 
+                window.i18nManager.t('feedback.lastFeedback.imagesAttached', '张图片') : 
+                '张图片';
+            html += '<div class="last-feedback-images">';
+            html += '<span class="last-feedback-images-icon">🖼️</span>';
+            html += '<span>' + feedbackData.images.length + ' ' + imagesText + '</span>';
+            html += '</div>';
+        }
+        
+        content.innerHTML = html;
+        
+        // 显示预览卡片
+        preview.style.display = 'block';
+        
+        // 恢复折叠状态
+        if (this.lastFeedbackCollapsed) {
+            preview.classList.add('collapsed');
+        } else {
+            preview.classList.remove('collapsed');
+        }
+        
+        // 检查是否需要截断
+        this.checkLastFeedbackTruncation();
+        
+        console.log('📤 已显示上次反馈预览');
+    };
+
+    /**
+     * 隐藏上次反馈预览
+     */
+    UIManager.prototype.hideLastFeedback = function() {
+        var preview = Utils.safeQuerySelector('#lastFeedbackPreview');
+        if (preview) {
+            preview.style.display = 'none';
+        }
+        this.lastFeedbackData = null;
+    };
+
+    /**
+     * 检查并处理内容截断
+     */
+    UIManager.prototype.checkLastFeedbackTruncation = function() {
+        var content = Utils.safeQuerySelector('#lastFeedbackContent');
+        var preview = Utils.safeQuerySelector('#lastFeedbackPreview');
+        
+        if (!content || !preview) return;
+        
+        // 检查内容是否超过最大高度
+        if (content.scrollHeight > 150) {
+            preview.classList.add('truncated');
+        } else {
+            preview.classList.remove('truncated');
+        }
+    };
+
+    /**
+     * 切换上次反馈预览的折叠状态
+     */
+    UIManager.prototype.toggleLastFeedbackCollapse = function() {
+        var preview = Utils.safeQuerySelector('#lastFeedbackPreview');
+        if (!preview) return;
+        
+        this.lastFeedbackCollapsed = !this.lastFeedbackCollapsed;
+        
+        if (this.lastFeedbackCollapsed) {
+            preview.classList.add('collapsed');
+        } else {
+            preview.classList.remove('collapsed');
+        }
+        
+        // 保存折叠偏好到 localStorage
+        try {
+            localStorage.setItem('lastFeedbackCollapsed', this.lastFeedbackCollapsed ? 'true' : 'false');
+        } catch (e) {
+            console.warn('⚠️ 无法保存折叠偏好');
+        }
+    };
+
+    /**
+     * 获取上次反馈数据
+     */
+    UIManager.prototype.getLastFeedbackData = function() {
+        return this.lastFeedbackData;
+    };
+
+    /**
+     * 初始化上次反馈预览事件
+     */
+    UIManager.prototype.initLastFeedbackEvents = function() {
+        var self = this;
+        
+        // 从 localStorage 恢复折叠状态
+        try {
+            var saved = localStorage.getItem('lastFeedbackCollapsed');
+            this.lastFeedbackCollapsed = saved === 'true';
+        } catch (e) {
+            this.lastFeedbackCollapsed = false;
+        }
+        
+        // 折叠/展开按钮
+        var toggleBtn = Utils.safeQuerySelector('#toggleLastFeedbackBtn');
+        if (toggleBtn) {
+            toggleBtn.addEventListener('click', function(e) {
+                e.stopPropagation();
+                self.toggleLastFeedbackCollapse();
+            });
+        }
+        
+        // 点击 header 也可以折叠/展开
+        var header = Utils.safeQuerySelector('.last-feedback-header');
+        if (header) {
+            header.addEventListener('click', function(e) {
+                // 如果点击的是按钮，不触发
+                if (e.target.closest('.last-feedback-btn')) return;
+                self.toggleLastFeedbackCollapse();
+            });
+        }
+        
+        console.log('✅ 上次反馈预览事件初始化完成');
     };
 
     // 將 UIManager 加入命名空間

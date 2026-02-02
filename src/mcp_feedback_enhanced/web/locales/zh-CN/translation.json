@@ -51,7 +51,18 @@
         "noContent": "没有可复制的内容",
         "copySuccess": "内容已复制到剪贴板",
         "copyFailed": "复制失败",
-        "provideTextOrImage": "请提供反馈文字或上传图片"
+        "provideTextOrImage": "请提供反馈文字或上传图片",
+        "lastFeedback": {
+            "title": "上次反馈",
+            "copy": "复制内容",
+            "load": "载入到输入框",
+            "collapse": "收起",
+            "expand": "展开",
+            "showMore": "展开更多",
+            "copied": "已复制到剪贴板",
+            "loaded": "已载入到输入框",
+            "imagesAttached": "张图片"
+        }
     },
     "summary": {
         "title": "📋 AI 工作摘要",

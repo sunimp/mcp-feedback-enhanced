@@ -51,7 +51,18 @@
         "noContent": "No content to copy",
         "copySuccess": "Content copied to clipboard",
         "copyFailed": "Failed to copy",
-        "provideTextOrImage": "Please provide feedback text or upload an image"
+        "provideTextOrImage": "Please provide feedback text or upload an image",
+        "lastFeedback": {
+            "title": "Last Feedback",
+            "copy": "Copy content",
+            "load": "Load to input",
+            "collapse": "Collapse",
+            "expand": "Expand",
+            "showMore": "Show more",
+            "copied": "Copied to clipboard",
+            "loaded": "Loaded to input",
+            "imagesAttached": "image(s)"
+        }
     },
     "summary": {
         "title": "📋 AI Work Summary",

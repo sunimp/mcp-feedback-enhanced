@@ -258,6 +258,11 @@
                         // 15. 初始化各個管理器
                         self.uiManager.initTabs();
                         self.imageHandler.init();
+                        
+                        // 15.1. 初始化上次反馈预览事件
+                        if (self.uiManager && self.uiManager.initLastFeedbackEvents) {
+                            self.uiManager.initLastFeedbackEvents();
+                        }
 
                         // 16. 檢查並啟動自動提交（如果條件滿足）
                         setTimeout(function() {
@@ -336,6 +341,24 @@
                 copyUserFeedback.addEventListener('click', function(e) {
                     e.preventDefault();
                     self.copyUserFeedback();
+                });
+            }
+            
+            // 复制上次反馈按钮
+            const copyLastFeedbackBtn = window.MCPFeedback.Utils.safeQuerySelector('#copyLastFeedbackBtn');
+            if (copyLastFeedbackBtn) {
+                copyLastFeedbackBtn.addEventListener('click', function(e) {
+                    e.stopPropagation();
+                    self.copyLastFeedback();
+                });
+            }
+            
+            // 载入上次反馈到输入框按钮
+            const loadLastFeedbackBtn = window.MCPFeedback.Utils.safeQuerySelector('#loadLastFeedbackBtn');
+            if (loadLastFeedbackBtn) {
+                loadLastFeedbackBtn.addEventListener('click', function(e) {
+                    e.stopPropagation();
+                    self.loadLastFeedback();
                 });
             }
 
@@ -876,6 +899,11 @@
                 // 4. 重置回饋狀態為等待中
                 if (self.uiManager) {
                     self.uiManager.setFeedbackState(window.MCPFeedback.Utils.CONSTANTS.FEEDBACK_WAITING, self.currentSessionId);
+                    
+                    // 隐藏上次反馈预览（新会话开始）
+                    if (self.uiManager.hideLastFeedback) {
+                        self.uiManager.hideLastFeedback();
+                    }
                 }
                 
                 // 5. 重新啟動會話超時計時器（如果已啟用）
@@ -1222,6 +1250,11 @@
             });
 
             if (success) {
+                // 显示上次反馈预览
+                if (this.uiManager && this.uiManager.showLastFeedback) {
+                    this.uiManager.showLastFeedback(feedbackData);
+                }
+                
                 // 重置表單狀態並清空文字內容
                 if (this.uiManager) {
                     this.uiManager.resetFeedbackForm(true);  // true 表示清空文字
@@ -1302,6 +1335,46 @@
         }
 
         console.log('✅ 回饋內容清空完成');
+    };
+
+    /**
+     * 复制上次反馈内容到剪贴板
+     */
+    FeedbackApp.prototype.copyLastFeedback = function() {
+        var feedbackData = this.uiManager ? this.uiManager.getLastFeedbackData() : null;
+        if (!feedbackData || !feedbackData.feedback) {
+            var noContent = window.i18nManager ? window.i18nManager.t('feedback.noContent') : '没有可复制的内容';
+            window.MCPFeedback.Utils.showMessage(noContent, window.MCPFeedback.Utils.CONSTANTS.MESSAGE_WARNING);
+            return;
+        }
+        
+        navigator.clipboard.writeText(feedbackData.feedback).then(function() {
+            var copied = window.i18nManager ? window.i18nManager.t('feedback.lastFeedback.copied') : '已复制到剪贴板';
+            window.MCPFeedback.Utils.showMessage(copied, window.MCPFeedback.Utils.CONSTANTS.MESSAGE_SUCCESS);
+        }).catch(function(err) {
+            console.error('复制失败:', err);
+            var failed = window.i18nManager ? window.i18nManager.t('feedback.copyFailed') : '复制失败';
+            window.MCPFeedback.Utils.showMessage(failed, window.MCPFeedback.Utils.CONSTANTS.MESSAGE_ERROR);
+        });
+    };
+
+    /**
+     * 载入上次反馈内容到输入框
+     */
+    FeedbackApp.prototype.loadLastFeedback = function() {
+        var feedbackData = this.uiManager ? this.uiManager.getLastFeedbackData() : null;
+        if (!feedbackData) {
+            return;
+        }
+        
+        var feedbackInput = window.MCPFeedback.Utils.safeQuerySelector('#combinedFeedbackText');
+        if (feedbackInput && feedbackData.feedback) {
+            feedbackInput.value = feedbackData.feedback;
+            feedbackInput.focus();
+            
+            var loaded = window.i18nManager ? window.i18nManager.t('feedback.lastFeedback.loaded') : '已载入到输入框';
+            window.MCPFeedback.Utils.showMessage(loaded, window.MCPFeedback.Utils.CONSTANTS.MESSAGE_SUCCESS);
+        }
     };
 
     /**

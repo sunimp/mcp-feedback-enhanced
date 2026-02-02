@@ -620,6 +620,30 @@
                         <div class="input-group">
                             <label class="input-label" data-i18n="feedback.textLabel">文字回饋</label>
 
+                            <!-- 上次反馈预览卡片 -->
+                            <div id="lastFeedbackPreview" class="last-feedback-preview" style="display: none;">
+                                <div class="last-feedback-header">
+                                    <span class="last-feedback-title">
+                                        <span class="last-feedback-icon">📤</span>
+                                        <span data-i18n="feedback.lastFeedback.title">上次反饋</span>
+                                    </span>
+                                    <div class="last-feedback-actions">
+                                        <button type="button" class="last-feedback-btn" id="copyLastFeedbackBtn" data-i18n-title="feedback.lastFeedback.copy" title="複製內容">
+                                            <span>📋</span>
+                                        </button>
+                                        <button type="button" class="last-feedback-btn" id="loadLastFeedbackBtn" data-i18n-title="feedback.lastFeedback.load" title="載入到輸入框">
+                                            <span>↩</span>
+                                        </button>
+                                        <button type="button" class="last-feedback-btn last-feedback-toggle" id="toggleLastFeedbackBtn" data-i18n-title="feedback.lastFeedback.collapse" title="收起">
+                                            <span class="toggle-icon">▼</span>
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="last-feedback-content" id="lastFeedbackContent">
+                                    <!-- 内容将通过 JS 动态填充 -->
+                                </div>
+                            </div>
+
                             <textarea
                                 id="combinedFeedbackText"
                                 class="text-input"
