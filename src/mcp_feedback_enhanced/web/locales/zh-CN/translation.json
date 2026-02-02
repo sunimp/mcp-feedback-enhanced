@@ -472,7 +472,8 @@
         "countdownLabel": "提交倒数",
         "pauseCountdown": "暂停倒数",
         "resumeCountdown": "恢复倒数",
-        "paused": "自动提交已暂停"
+        "paused": "自动提交已暂停",
+        "stoppedDueToInput": "当前倒计时已停止，请手动提交"
     },
     "audio": {
         "notification": {

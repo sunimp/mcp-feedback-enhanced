@@ -478,7 +478,8 @@
         "countdownLabel": "提交倒數",
         "pauseCountdown": "暫停倒數",
         "resumeCountdown": "恢復倒數",
-        "paused": "自動提交已暫停"
+        "paused": "自動提交已暫停",
+        "stoppedDueToInput": "目前倒計時已停止，請手動提交"
     },
     "audio": {
         "notification": {

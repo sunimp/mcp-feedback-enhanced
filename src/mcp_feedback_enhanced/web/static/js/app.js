@@ -866,7 +866,12 @@
                 self.refreshPageContent();
 
                 // 3. 重置表單狀態
-                self.clearFeedback();
+                const hasUserInput = window.MCPFeedback.Utils.hasUserFeedback();
+                if (!hasUserInput) {
+                    self.clearFeedback();
+                } else {
+                    console.log('🔒 新會話更新：保留使用者輸入，不清空文字回饋');
+                }
 
                 // 4. 重置回饋狀態為等待中
                 if (self.uiManager) {
@@ -1114,13 +1119,16 @@
     FeedbackApp.prototype.canSubmitFeedback = function() {
         // 簡化檢查：只檢查WebSocket連接，狀態由服務器端驗證
         const wsReady = this.webSocketManager && this.webSocketManager.isReady();
+        const feedbackState = this.uiManager ? this.uiManager.getFeedbackState() : null;
+        const isWaiting = feedbackState === window.MCPFeedback.Utils.CONSTANTS.FEEDBACK_WAITING;
 
         console.log('🔍 提交檢查:', {
             wsReady: wsReady,
-            sessionId: this.currentSessionId
+            sessionId: this.currentSessionId,
+            feedbackState: feedbackState
         });
 
-        return wsReady;
+        return wsReady && isWaiting;
     };
 
     /**
@@ -1214,9 +1222,9 @@
             });
 
             if (success) {
-                // 重置表單狀態但保留文字內容
+                // 重置表單狀態並清空文字內容
                 if (this.uiManager) {
-                    this.uiManager.resetFeedbackForm(false);  // false 表示不清空文字
+                    this.uiManager.resetFeedbackForm(true);  // true 表示清空文字
                 }
                 // 只清空圖片
                 if (this.imageHandler) {
@@ -1873,6 +1881,15 @@
         const currentState = this.uiManager ? this.uiManager.getFeedbackState() : null;
         const isWaitingForFeedback = currentState === window.MCPFeedback.Utils.CONSTANTS.FEEDBACK_WAITING;
 
+        // 如果使用者已經有輸入，避免啟動自動提交倒數
+        const hasUserInput = window.MCPFeedback.Utils.hasUserFeedback();
+        if (hasUserInput) {
+            console.log('⛔ 偵測到使用者輸入，跳過自動提交倒數啟動');
+            this.autoSubmitManager.stop();
+            this.updateAutoSubmitStatus('disabled');
+            return;
+        }
+
         console.log('🔍 當前回饋狀態:', currentState, '是否等待回饋:', isWaitingForFeedback);
 
         // 如果所有條件都滿足，啟動自動提交
@@ -1976,6 +1993,15 @@
         // 設定提示詞內容到回饋輸入框
         const feedbackInput = window.MCPFeedback.Utils.safeQuerySelector('#combinedFeedbackText');
         if (feedbackInput) {
+            if (window.MCPFeedback.Utils.hasUserFeedback()) {
+                const message = window.i18nManager ?
+                    window.i18nManager.t('autoSubmit.stoppedDueToInput', 'Countdown stopped. Please submit manually') :
+                    'Countdown stopped. Please submit manually';
+                window.MCPFeedback.Utils.showMessage(message, window.MCPFeedback.Utils.CONSTANTS.MESSAGE_WARNING);
+                this.autoSubmitManager.stop();
+                this.updateAutoSubmitStatus('disabled');
+                return;
+            }
             feedbackInput.value = prompt.content;
         }
 

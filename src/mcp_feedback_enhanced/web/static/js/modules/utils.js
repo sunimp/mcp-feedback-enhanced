@@ -261,6 +261,15 @@
         },
 
         /**
+         * 檢查使用者是否已輸入回饋文字
+         * @returns {boolean} 是否已有輸入內容
+         */
+        hasUserFeedback: function() {
+            const feedbackInput = this.safeQuerySelector('#combinedFeedbackText');
+            return !!(feedbackInput && feedbackInput.value.trim().length > 0);
+        },
+
+        /**
          * 顯示訊息提示
          * @param {string} message - 訊息內容
          * @param {string} type - 訊息類型 (success, error, warning, info)
