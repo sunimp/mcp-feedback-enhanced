@@ -899,11 +899,6 @@
                 // 4. 重置回饋狀態為等待中
                 if (self.uiManager) {
                     self.uiManager.setFeedbackState(window.MCPFeedback.Utils.CONSTANTS.FEEDBACK_WAITING, self.currentSessionId);
-                    
-                    // 隐藏上次反馈预览（新会话开始）
-                    if (self.uiManager.hideLastFeedback) {
-                        self.uiManager.hideLastFeedback();
-                    }
                 }
                 
                 // 5. 重新啟動會話超時計時器（如果已啟用）
