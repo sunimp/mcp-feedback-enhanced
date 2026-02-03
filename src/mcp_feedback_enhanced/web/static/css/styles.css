@@ -1169,7 +1169,13 @@ body {
     overflow: hidden;
 }
 
+#tab-combined.tab-content {
+    overflow: hidden;
+}
+
 #tab-combined .combined-content {
+    display: flex;
+    flex-direction: column;
     flex: 1;
     min-height: 0;
     overflow: hidden;
@@ -1177,6 +1183,30 @@ body {
 
 #tab-combined .combined-section {
     min-height: 0;
+    margin-bottom: 0;
+}
+
+#tab-combined .combined-section:first-child {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+#tab-combined .combined-section:last-child {
+    flex: 0 0 auto;
+}
+
+#tab-combined .combined-summary {
+    flex: 1;
+    min-height: 0;
+}
+
+#tab-combined #combinedSummaryContent {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
 }
 
 .tab-content.active {
