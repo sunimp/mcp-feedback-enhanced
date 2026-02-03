@@ -401,12 +401,12 @@
                 return this.escapeHtml(content);
             }
 
-            // 使用 marked 解析 Markdown
+            // 使用 marked 解析 Markdown（highlight.js 配置由 UIManager 處理）
             const htmlContent = window.marked.parse(content);
 
             // 使用 DOMPurify 清理 HTML
             const cleanHtml = window.DOMPurify.sanitize(htmlContent, {
-                ALLOWED_TAGS: ['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p', 'br', 'strong', 'em', 'code', 'pre', 'ul', 'ol', 'li', 'blockquote', 'a', 'hr', 'del', 's', 'table', 'thead', 'tbody', 'tr', 'td', 'th'],
+                ALLOWED_TAGS: ['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p', 'br', 'strong', 'em', 'code', 'pre', 'ul', 'ol', 'li', 'blockquote', 'a', 'hr', 'del', 's', 'table', 'thead', 'tbody', 'tr', 'td', 'th', 'span'],
                 ALLOWED_ATTR: ['href', 'title', 'class', 'align', 'style'],
                 ALLOW_DATA_ATTR: false
             });

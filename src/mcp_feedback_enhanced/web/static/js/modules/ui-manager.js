@@ -433,12 +433,36 @@
                 return this.escapeHtml(content);
             }
 
+            // 配置 marked 使用 highlight.js
+            if (typeof window.hljs !== 'undefined' && !this._markedConfigured) {
+                window.marked.setOptions({
+                    highlight: function(code, lang) {
+                        if (lang && window.hljs.getLanguage(lang)) {
+                            try {
+                                return window.hljs.highlight(code, { language: lang }).value;
+                            } catch (e) {
+                                console.warn('⚠️ 代碼高亮失敗:', e);
+                            }
+                        }
+                        // 自動檢測語言
+                        try {
+                            return window.hljs.highlightAuto(code).value;
+                        } catch (e) {
+                            return code;
+                        }
+                    },
+                    langPrefix: 'hljs language-'
+                });
+                this._markedConfigured = true;
+                console.log('✅ marked.js 已配置 highlight.js 代碼高亮');
+            }
+
             // 使用 marked 解析 Markdown
             const htmlContent = window.marked.parse(content);
 
             // 使用 DOMPurify 清理 HTML
             const cleanHtml = window.DOMPurify.sanitize(htmlContent, {
-                ALLOWED_TAGS: ['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p', 'br', 'strong', 'em', 'code', 'pre', 'ul', 'ol', 'li', 'blockquote', 'a', 'hr', 'del', 's', 'table', 'thead', 'tbody', 'tr', 'td', 'th'],
+                ALLOWED_TAGS: ['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p', 'br', 'strong', 'em', 'code', 'pre', 'ul', 'ol', 'li', 'blockquote', 'a', 'hr', 'del', 's', 'table', 'thead', 'tbody', 'tr', 'td', 'th', 'span'],
                 ALLOWED_ATTR: ['href', 'title', 'class', 'align', 'style'],
                 ALLOW_DATA_ATTR: false
             });
@@ -579,14 +603,83 @@
 
         this.lastFeedbackData = feedbackData;
         
+        // 保存到 localStorage
+        this.saveLastFeedbackToStorage(feedbackData);
+        
+        this.renderLastFeedbackPreview(feedbackData);
+    };
+
+    /**
+     * 保存上次反馈到 localStorage
+     */
+    UIManager.prototype.saveLastFeedbackToStorage = function(feedbackData) {
+        try {
+            // 只保存文字内容，不保存图片数据（太大）
+            var dataToSave = {
+                feedback: feedbackData.feedback || '',
+                imageCount: feedbackData.images ? feedbackData.images.length : 0,
+                timestamp: Date.now()
+            };
+            localStorage.setItem('mcp_last_feedback', JSON.stringify(dataToSave));
+            console.log('💾 上次反馈已保存到 localStorage');
+        } catch (e) {
+            console.warn('⚠️ 无法保存上次反馈到 localStorage:', e);
+        }
+    };
+
+    /**
+     * 从 localStorage 加载上次反馈
+     */
+    UIManager.prototype.loadLastFeedbackFromStorage = function() {
+        try {
+            var saved = localStorage.getItem('mcp_last_feedback');
+            if (saved) {
+                var data = JSON.parse(saved);
+                // 构建 feedbackData 格式
+                var feedbackData = {
+                    feedback: data.feedback || '',
+                    images: [], // 图片无法恢复，只显示数量
+                    _imageCount: data.imageCount || 0, // 用于显示历史图片数量
+                    _timestamp: data.timestamp
+                };
+                return feedbackData;
+            }
+        } catch (e) {
+            console.warn('⚠️ 无法从 localStorage 加载上次反馈:', e);
+        }
+        return null;
+    };
+
+    /**
+     * 渲染上次反馈预览卡片
+     */
+    UIManager.prototype.renderLastFeedbackPreview = function(feedbackData) {
+        var self = this;
         var preview = Utils.safeQuerySelector('#lastFeedbackPreview');
         var content = Utils.safeQuerySelector('#lastFeedbackContent');
         
         if (!preview || !content) {
-            console.warn('⚠️ 找不到上次反馈预览元素');
+            console.warn('⚠️ 找不到上次反馈预览元素，将在 100ms 后重试');
+            // 延迟重试一次
+            setTimeout(function() {
+                var retryPreview = Utils.safeQuerySelector('#lastFeedbackPreview');
+                var retryContent = Utils.safeQuerySelector('#lastFeedbackContent');
+                if (retryPreview && retryContent) {
+                    self._doRenderLastFeedbackPreview(retryPreview, retryContent, feedbackData);
+                } else {
+                    console.error('❌ 重试后仍找不到上次反馈预览元素');
+                }
+            }, 100);
             return;
         }
         
+        this._doRenderLastFeedbackPreview(preview, content, feedbackData);
+    };
+
+    /**
+     * 实际渲染上次反馈预览卡片
+     */
+    UIManager.prototype._doRenderLastFeedbackPreview = function(preview, content, feedbackData) {
         // 构建内容 HTML
         var html = '';
         
@@ -595,14 +688,18 @@
             html += '<div class="last-feedback-text">' + this.escapeHtml(feedbackData.feedback) + '</div>';
         }
         
-        // 图片指示器
-        if (feedbackData.images && feedbackData.images.length > 0) {
+        // 图片指示器 - 支持实际图片和历史图片数量
+        var imageCount = (feedbackData.images && feedbackData.images.length > 0) 
+            ? feedbackData.images.length 
+            : (feedbackData._imageCount || 0);
+            
+        if (imageCount > 0) {
             var imagesText = window.i18nManager ? 
                 window.i18nManager.t('feedback.lastFeedback.imagesAttached', '张图片') : 
                 '张图片';
             html += '<div class="last-feedback-images">';
             html += '<span class="last-feedback-images-icon">🖼️</span>';
-            html += '<span>' + feedbackData.images.length + ' ' + imagesText + '</span>';
+            html += '<span>' + imageCount + ' ' + imagesText + '</span>';
             html += '</div>';
         }
         
@@ -617,9 +714,6 @@
         } else {
             preview.classList.remove('collapsed');
         }
-        
-        // 检查是否需要截断
-        this.checkLastFeedbackTruncation();
         
         console.log('📤 已显示上次反馈预览');
     };
@@ -688,6 +782,8 @@
     UIManager.prototype.initLastFeedbackEvents = function() {
         var self = this;
         
+        console.log('🔧 开始初始化上次反馈预览...');
+        
         // 从 localStorage 恢复折叠状态
         try {
             var saved = localStorage.getItem('lastFeedbackCollapsed');
@@ -713,6 +809,18 @@
                 if (e.target.closest('.last-feedback-btn')) return;
                 self.toggleLastFeedbackCollapse();
             });
+        }
+        
+        // 从 localStorage 恢复上次反馈数据
+        var savedFeedback = this.loadLastFeedbackFromStorage();
+        console.log('🔍 从 localStorage 加载的反馈数据:', savedFeedback);
+        
+        if (savedFeedback && (savedFeedback.feedback || savedFeedback._imageCount > 0)) {
+            this.lastFeedbackData = savedFeedback;
+            this.renderLastFeedbackPreview(savedFeedback);
+            console.log('📂 已从 localStorage 恢复上次反馈预览');
+        } else {
+            console.log('📭 localStorage 中没有上次反馈数据');
         }
         
         console.log('✅ 上次反馈预览事件初始化完成');

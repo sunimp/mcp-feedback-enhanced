@@ -441,20 +441,31 @@ pre code {
 
 /* CSS 變數定義 */
 :root {
-    /* 深色主題顏色變數 */
-    --bg-primary: #1e1e1e;
-    --bg-secondary: #2d2d30;
-    --bg-tertiary: #252526;
-    --surface-color: #333333;
-    --text-primary: #cccccc;
-    --text-secondary: #9e9e9e;
-    --accent-color: #007acc;
-    --accent-hover: #005a9e;
-    --border-color: #464647;
-    --success-color: #4caf50;
-    --warning-color: #ff9800;
-    --error-color: #f44336;
-    --info-color: #2196f3;
+    /* 暗色終端風格 - 類似 VS Code / Terminal */
+    --bg-primary: #0d1117;
+    --bg-secondary: #161b22;
+    --bg-tertiary: #21262d;
+    --surface-color: #30363d;
+    --text-primary: #e6edf3;
+    --text-secondary: #8b949e;
+    --accent-color: #58a6ff;
+    --accent-hover: #79c0ff;
+    --border-color: #30363d;
+    --success-color: #3fb950;
+    --warning-color: #d29922;
+    --error-color: #f85149;
+    --info-color: #58a6ff;
+    
+    /* 終端特有顏色 */
+    --terminal-green: #3fb950;
+    --terminal-cyan: #39c5cf;
+    --terminal-yellow: #d29922;
+    --terminal-purple: #a371f7;
+    --terminal-red: #f85149;
+    
+    /* 代碼高亮顏色 */
+    --code-bg: #161b22;
+    --code-border: #30363d;
 }
 
 /* 基礎重置 */
@@ -466,13 +477,16 @@ pre code {
 
 /* 主體樣式 */
 body {
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', 'JetBrains Mono', 'Consolas', 'Monaco', monospace;
     background: var(--bg-primary);
     color: var(--text-primary);
     line-height: 1.6;
     min-height: 100vh;
     display: flex;
     flex-direction: column;
+    font-size: 14px;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
 }
 
 /* 容器樣式 */
@@ -909,24 +923,27 @@ body {
     display: block;
     font-weight: 500;
     margin-bottom: 8px;
-    color: var(--text-primary);
+    color: var(--terminal-cyan);
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
 }
 
 .text-input,
 .command-input {
     width: 100%;
     max-width: 100%;
-    background: var(--bg-primary);
-    border: 1px solid var(--border-color);
-    border-radius: 6px;
+    background: var(--code-bg);
+    border: 1px solid var(--code-border);
+    border-radius: 4px;
     padding: 12px;
     color: var(--text-primary);
     font-size: 14px;
     line-height: 1.5;
     resize: vertical;
     min-height: 220px;
-    font-family: inherit;
-    transition: border-color 0.3s ease;
+    font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', 'JetBrains Mono', 'Consolas', monospace;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
     box-sizing: border-box;
 }
 
@@ -934,6 +951,13 @@ body {
 .command-input:focus {
     outline: none;
     border-color: var(--accent-color);
+    box-shadow: 0 0 0 3px rgba(88, 166, 255, 0.15);
+}
+
+.text-input::placeholder,
+.command-input::placeholder {
+    color: var(--text-secondary);
+    opacity: 0.7;
 }
 
 .command-input {
@@ -987,46 +1011,52 @@ body {
 
 /* 按鈕樣式 */
 .btn {
-    padding: 10px 20px;
-    border: none;
-    border-radius: 6px;
+    padding: 8px 16px;
+    border: 1px solid transparent;
+    border-radius: 4px;
     cursor: pointer;
-    font-size: 14px;
+    font-size: 13px;
     font-weight: 500;
-    transition: all 0.3s ease;
+    font-family: inherit;
+    transition: all 0.15s ease;
     text-decoration: none;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    gap: 8px;
+    gap: 6px;
 }
 
 .btn-primary {
     background: var(--accent-color);
-    color: white;
+    color: #ffffff;
+    border-color: var(--accent-color);
 }
 
 .btn-primary:hover {
     background: var(--accent-hover);
+    border-color: var(--accent-hover);
 }
 
 .btn-secondary {
-    background: var(--bg-tertiary);
+    background: transparent;
     color: var(--text-primary);
     border: 1px solid var(--border-color);
 }
 
 .btn-secondary:hover {
-    background: var(--surface-color);
+    background: var(--bg-tertiary);
+    border-color: var(--text-secondary);
 }
 
 .btn-success {
-    background: var(--success-color);
-    color: white;
+    background: var(--terminal-green);
+    color: #ffffff;
+    border-color: var(--terminal-green);
 }
 
 .btn-success:hover {
-    background: #45a049;
+    background: #2ea043;
+    border-color: #2ea043;
 }
 
 /* 底部操作按鈕 */
@@ -1081,7 +1111,8 @@ body {
 
 .tab-buttons {
     display: flex;
-    gap: 2px;
+    gap: 0;
+    border-bottom: 1px solid var(--border-color);
 }
 
 .tab-button {
@@ -1091,21 +1122,23 @@ body {
     padding: 10px 16px;
     cursor: pointer;
     border-bottom: 2px solid transparent;
-    transition: all 0.3s ease;
-    font-size: 14px;
+    transition: all 0.15s ease;
+    font-size: 13px;
     font-weight: 500;
-    border-radius: 4px 4px 0 0;
+    font-family: inherit;
+    margin-bottom: -1px;
 }
 
 .tab-button.active {
-    color: var(--accent-color);
-    border-bottom-color: var(--accent-color);
-    background: var(--bg-tertiary);
+    color: var(--terminal-cyan);
+    border-bottom-color: var(--terminal-cyan);
+    background: transparent;
 }
 
 .tab-button:hover:not(.active) {
     color: var(--text-primary);
-    background: rgba(255, 255, 255, 0.05);
+    background: transparent;
+    border-bottom-color: var(--text-secondary);
 }
 
 .tab-button.hidden {
@@ -1118,13 +1151,14 @@ body {
     flex: 1;
     background: var(--bg-secondary);
     border: 1px solid var(--border-color);
-    border-radius: 8px;
-    padding: 20px;
+    border-top: none;
+    border-radius: 0 0 4px 4px;
+    padding: 16px;
     overflow-y: auto;
     width: 100%;
     max-width: 100%;
     box-sizing: border-box;
-    min-height: 0; /* 移除固定高度，使用 flex 自適應 */
+    min-height: 0;
 }
 
 .tab-content.active {
@@ -2203,12 +2237,13 @@ textarea:-ms-input-placeholder,
 
 /* ===== 上次反馈预览卡片 ===== */
 .last-feedback-preview {
-    background: var(--bg-tertiary);
-    border: 1px solid var(--border-color);
-    border-radius: 6px;
+    background: var(--code-bg);
+    border: 1px solid var(--terminal-cyan);
+    border-left: 3px solid var(--terminal-cyan);
+    border-radius: 4px;
     margin-bottom: 12px;
     overflow: hidden;
-    transition: all 0.3s ease;
+    transition: all 0.15s ease;
 }
 
 .last-feedback-preview.collapsed .last-feedback-content {
@@ -2224,7 +2259,7 @@ textarea:-ms-input-placeholder,
     justify-content: space-between;
     align-items: center;
     padding: 8px 12px;
-    background: var(--bg-secondary);
+    background: rgba(57, 197, 207, 0.05);
     border-bottom: 1px solid var(--border-color);
     cursor: pointer;
     user-select: none;
@@ -2238,9 +2273,11 @@ textarea:-ms-input-placeholder,
     display: flex;
     align-items: center;
     gap: 6px;
-    font-size: 13px;
+    font-size: 12px;
     font-weight: 500;
-    color: var(--text-primary);
+    color: var(--terminal-cyan);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
 }
 
 .last-feedback-icon {
@@ -2257,22 +2294,22 @@ textarea:-ms-input-placeholder,
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 28px;
-    height: 28px;
+    width: 26px;
+    height: 26px;
     padding: 0;
     background: transparent;
     border: 1px solid transparent;
     border-radius: 4px;
     color: var(--text-secondary);
     cursor: pointer;
-    transition: all 0.2s ease;
-    font-size: 14px;
+    transition: all 0.15s ease;
+    font-size: 13px;
 }
 
 .last-feedback-btn:hover {
-    background: var(--bg-primary);
+    background: var(--bg-tertiary);
     border-color: var(--border-color);
-    color: var(--text-primary);
+    color: var(--terminal-cyan);
 }
 
 .last-feedback-btn:active {
