@@ -476,6 +476,10 @@ pre code {
 }
 
 /* 主體樣式 */
+html, body {
+    height: 100%;
+}
+
 body {
     font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', 'JetBrains Mono', 'Consolas', 'Monaco', monospace;
     background: var(--bg-primary);
@@ -489,6 +493,11 @@ body {
     -moz-osx-font-smoothing: grayscale;
 }
 
+body.layout-combined-vertical,
+body.layout-combined-horizontal {
+    overflow: hidden;
+}
+
 /* 容器樣式 */
 .container {
     width: 100%;
@@ -499,6 +508,13 @@ body {
     min-height: 100vh;
     display: flex;
     flex-direction: column;
+}
+
+body.layout-combined-vertical .container,
+body.layout-combined-horizontal .container {
+    flex: 1;
+    min-height: 0;
+    height: 100%;
 }
 
 /* 頭部樣式 */
@@ -1937,6 +1953,12 @@ textarea:-ms-input-placeholder,
     padding-bottom: 0 !important;
 }
 
+#combinedSummaryContent ol,
+#combinedSummaryContent ul {
+    list-style-position: inside;
+    padding-left: 0.8em !important;
+}
+
 #summaryContent li, #combinedSummaryContent li {
     margin: 0 !important;
     margin-top: 0 !important;
@@ -2392,4 +2414,3 @@ textarea:-ms-input-placeholder,
 .last-feedback-preview.expanded .last-feedback-expand {
     display: none;
 }
-
