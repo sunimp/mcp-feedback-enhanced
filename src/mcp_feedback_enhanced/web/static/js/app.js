@@ -1788,6 +1788,14 @@
                     self.uiManager.updateAISummaryContent(sessionData.summary);
                     self.uiManager.resetFeedbackForm(false);  // 不清空文字內容
                     self.uiManager.updateStatusIndicator();
+
+                    // 恢復上次回饋預覽（避免局部刷新後隱藏）
+                    if (self.uiManager.loadLastFeedbackFromStorage && self.uiManager.renderLastFeedbackPreview) {
+                        const savedFeedback = self.uiManager.loadLastFeedbackFromStorage();
+                        if (savedFeedback && (savedFeedback.feedback || savedFeedback._imageCount > 0)) {
+                            self.uiManager.renderLastFeedbackPreview(savedFeedback);
+                        }
+                    }
                 }
 
                 // 更新頁面標題
