@@ -43,6 +43,7 @@ Desktop.ini
 
 # Others
 .cursor/rules/
+.worktrees/
 uv.lock
 .mcp_feedback_settings.json
 test_reports/
