@@ -555,9 +555,13 @@ class WebFeedbackSession:
                 # 檢查是否為桌面模式，如果是則立即關閉桌面應用程式
                 import os
 
-                if os.environ.get("MCP_DESKTOP_MODE", "").lower() == "true":
-                    debug_log("桌面模式：反饋提交後立即關閉桌面應用程式")
-
+                # 檢查是否為桌面模式 且 設置了自動關閉
+                desktop_mode = os.environ.get("MCP_DESKTOP_MODE", "").lower() == "true"
+                auto_close = os.environ.get("MCP_AUTO_CLOSE_ON_SUBMIT", "true").lower() == "true"
+                
+                if desktop_mode and auto_close:
+                    debug_log("桌面模式：反饋提交後立即關閉桌面應用程式（MCP_AUTO_CLOSE_ON_SUBMIT=true）")
+                    
                     # 立即關閉桌面應用程式，無延遲
                     try:
                         from ..main import get_web_ui_manager
@@ -567,6 +571,8 @@ class WebFeedbackSession:
                         debug_log("桌面應用程式立即關閉成功")
                     except Exception as close_error:
                         debug_log(f"立即關閉桌面應用程式失敗: {close_error}")
+                elif desktop_mode and not auto_close:
+                    debug_log("桌面模式：MCP_AUTO_CLOSE_ON_SUBMIT=false，保持窗口開啟")
 
             except Exception as e:
                 debug_log(f"發送反饋確認失敗: {e}")
