@@ -49,12 +49,29 @@
         // 自動提交管理器
         this.autoSubmitManager = null;
 
+        // 選項選擇管理
+        this.choiceData = null;
+        this.choiceSelection = {
+            selected_ids: [],
+            option_annotations: {}
+        };
+        this.choiceAutoSubmitManager = null;
+        this.choiceOptionMap = {};
+
         // 應用程式狀態
         this.isInitialized = false;
         this.pendingSubmission = null;
 
         // 初始化防抖函數
-        this.initDebounceHandlers();
+        try {
+            this.initDebounceHandlers();
+        } catch (error) {
+            console.error('❌ 初始化防抖處理器失敗，將使用原始處理器:', error);
+            this._debouncedCheckAndStartAutoSubmit = this._originalCheckAndStartAutoSubmit.bind(this);
+            this._debouncedHandleWebSocketMessage = this._originalHandleWebSocketMessage.bind(this);
+            this._debouncedHandleSessionUpdated = this._originalHandleSessionUpdated.bind(this);
+            this._debouncedHandleStatusUpdate = this._originalHandleStatusUpdate.bind(this);
+        }
 
         console.log('🚀 FeedbackApp 建構函數初始化完成');
     }
@@ -63,35 +80,48 @@
      * 初始化防抖處理器
      */
     FeedbackApp.prototype.initDebounceHandlers = function() {
+        const debounce = window.MCPFeedback
+            && window.MCPFeedback.Utils
+            && window.MCPFeedback.Utils.DOM
+            && window.MCPFeedback.Utils.DOM.debounce;
+
+        if (typeof debounce !== 'function') {
+            console.warn('⚠️ debounce 不可用，將使用原始處理器');
+            this._debouncedCheckAndStartAutoSubmit = this._originalCheckAndStartAutoSubmit.bind(this);
+            this._debouncedHandleWebSocketMessage = this._originalHandleWebSocketMessage.bind(this);
+            this._debouncedHandleSessionUpdated = this._originalHandleSessionUpdated.bind(this);
+            this._debouncedHandleStatusUpdate = this._originalHandleStatusUpdate.bind(this);
+            return;
+        }
+
         // 為自動提交檢查添加防抖
-        this._debouncedCheckAndStartAutoSubmit = window.MCPFeedback.Utils.DOM.debounce(
+        this._debouncedCheckAndStartAutoSubmit = debounce(
             this._originalCheckAndStartAutoSubmit.bind(this),
             200,
             false
         );
 
         // 為 WebSocket 訊息處理添加防抖
-        this._debouncedHandleWebSocketMessage = window.MCPFeedback.Utils.DOM.debounce(
+        this._debouncedHandleWebSocketMessage = debounce(
             this._originalHandleWebSocketMessage.bind(this),
             50,
             false
         );
 
         // 為會話更新處理添加防抖
-        this._debouncedHandleSessionUpdated = window.MCPFeedback.Utils.DOM.debounce(
+        this._debouncedHandleSessionUpdated = debounce(
             this._originalHandleSessionUpdated.bind(this),
             100,
             false
         );
 
         // 為狀態更新處理添加防抖
-        this._debouncedHandleStatusUpdate = window.MCPFeedback.Utils.DOM.debounce(
+        this._debouncedHandleStatusUpdate = debounce(
             this._originalHandleStatusUpdate.bind(this),
             100,
             false
         );
     };
-
     /**
      * 初始化應用程式
      */
@@ -181,6 +211,14 @@
                                 self.handleLayoutModeChange(layoutMode);
                             }
                         });
+
+                        // 4. 初始化選項選擇管理器
+                        try {
+                            self.initializeChoiceManager();
+                        } catch (error) {
+                            console.error('❌ 初始化選項選擇管理器失敗:', error);
+                        }
+
 
 
 
@@ -451,6 +489,10 @@
             this.uiManager.updateStatusIndicator();
         }
 
+        // 重新渲染選項面板（更新語言文本）
+        if (this.choiceData) {
+            this.renderChoicePanel();
+        }
 
     };
 
@@ -774,6 +816,12 @@
             this.autoSubmitManager.stop();
         }
 
+        // 停止選項自動提交倒數（如果正在運行）
+        if (this.choiceAutoSubmitManager && this.choiceAutoSubmitManager.isEnabled) {
+            console.log('⏸️ 反饋已成功提交，停止選項自動提交倒數');
+            this.choiceAutoSubmitManager.stop();
+        }
+
         // 顯示成功訊息
         if (data.messageCode && window.i18nManager) {
             const message = window.i18nManager.t(data.messageCode, data.params);
@@ -888,6 +936,13 @@
                 // 2. 刷新頁面內容（AI 摘要、表單等）
                 self.refreshPageContent();
 
+                // 2.1 更新選項資料（新會話重置選擇）
+                if (data.session_info && data.session_info.choice_data) {
+                    self.updateChoiceData(data.session_info.choice_data, false);
+                } else {
+                    self.updateChoiceData(null, false);
+                }
+
                 // 3. 重置表單狀態
                 const hasUserInput = window.MCPFeedback.Utils.hasUserFeedback();
                 if (!hasUserInput) {
@@ -913,6 +968,7 @@
 
                 // 6. 檢查並啟動自動提交
                 self.checkAndStartAutoSubmit();
+                self.startChoiceAutoSubmitIfNeeded();
 
                 console.log('✅ 局部更新完成，頁面已準備好接收新的回饋');
             }, 500);
@@ -1093,6 +1149,7 @@
                 const self = this;
                 setTimeout(function() {
                     self.checkAndStartAutoSubmit();
+                    self.startChoiceAutoSubmitIfNeeded();
                 }, 100);
                 break;
             case 'completed':
@@ -1190,8 +1247,10 @@
         feedback = combinedFeedbackInput ? combinedFeedbackInput.value.trim() : '';
 
         const images = this.imageHandler ? this.imageHandler.getImages() : [];
+        const choiceResult = this.getChoiceResult(false);
+        const hasChoiceData = !!choiceResult;
 
-        if (!feedback && images.length === 0) {
+        if (!feedback && images.length === 0 && !hasChoiceData) {
             const message = window.i18nManager ? 
                 window.i18nManager.t('feedback.provideTextOrImage', '請提供回饋文字或上傳圖片') : 
                 '請提供回饋文字或上傳圖片';
@@ -1205,17 +1264,26 @@
             settings: {
                 image_size_limit: this.imageHandler ? this.imageHandler.imageSizeLimit : 0,
                 enable_base64_detail: this.imageHandler ? this.imageHandler.enableBase64Detail : false
-            }
+            },
+            choice_result: choiceResult
         };
     };
 
     /**
      * 內部提交回饋方法
      */
-    FeedbackApp.prototype.submitFeedbackInternal = function(feedbackData) {
+    FeedbackApp.prototype.submitFeedbackInternal = function(feedbackData, submitOptions) {
         console.log('📤 內部提交回饋...');
 
         try {
+            const options = submitOptions || {};
+            const isChoiceAutoSubmit = options.source === 'choice' && options.autoSubmitted === true;
+
+            // 標記選項自動提交狀態
+            if (feedbackData && feedbackData.choice_result && isChoiceAutoSubmit) {
+                feedbackData.choice_result.auto_submitted = true;
+            }
+
             // 1. 首先記錄用戶訊息到會話歷史（立即保存到伺服器）
             this.recordUserMessage(feedbackData);
 
@@ -1229,6 +1297,12 @@
                 console.log('⏸️ 手動提交反饋，停止自動提交倒數計時器');
                 this.autoSubmitManager.stop();
             }
+
+            // 停止選項自動提交倒數
+            if (this.choiceAutoSubmitManager && this.choiceAutoSubmitManager.isEnabled) {
+                console.log('⏸️ 停止選項自動提交倒數計時器');
+                this.choiceAutoSubmitManager.stop();
+            }
             
             // 停止會話超時計時器
             if (this.webSocketManager) {
@@ -1241,7 +1315,8 @@
                 type: 'submit_feedback',
                 feedback: feedbackData.feedback,
                 images: feedbackData.images,
-                settings: feedbackData.settings
+                settings: feedbackData.settings,
+                choice_result: feedbackData.choice_result || null
             });
 
             if (success) {
@@ -1258,6 +1333,9 @@
                 if (this.imageHandler) {
                     this.imageHandler.clearImages();
                 }
+                // 重置選項選擇
+                this.resetChoiceSelectionToDefault(true);
+                this.renderChoicePanel();
                 console.log('📤 回饋已發送，等待服務器確認...');
             } else {
                 throw new Error('WebSocket 發送失敗');
@@ -1329,7 +1407,477 @@
             this.imageHandler.clearImages();
         }
 
+        // 清空選項選擇
+        this.resetChoiceSelectionToDefault(true);
+        this.renderChoicePanel();
+
         console.log('✅ 回饋內容清空完成');
+    };
+
+    /**
+     * 初始化選項選擇管理器
+     */
+    FeedbackApp.prototype.initializeChoiceManager = function() {
+        this.setupChoiceAutoSubmitManager();
+        const initialChoiceData = this.loadChoiceDataFromPage();
+        this.updateChoiceData(initialChoiceData, true);
+    };
+
+    /**
+     * 從頁面讀取初始選項資料
+     */
+    FeedbackApp.prototype.loadChoiceDataFromPage = function() {
+        const el = document.getElementById('choiceData');
+        if (!el) return null;
+        const raw = (el.textContent || '').trim();
+        if (!raw) return null;
+        try {
+            return JSON.parse(raw);
+        } catch (error) {
+            console.warn('❌ 解析選項資料失敗:', error);
+            return null;
+        }
+    };
+
+    /**
+     * 正規化選項資料
+     */
+    FeedbackApp.prototype.normalizeChoiceData = function(choiceData) {
+        if (!choiceData || !Array.isArray(choiceData.options) || choiceData.options.length === 0) {
+            return null;
+        }
+
+        const options = choiceData.options
+            .map(function(option) {
+                if (!option || !option.id || !option.description) return null;
+                return {
+                    id: String(option.id),
+                    description: String(option.description),
+                    recommended: !!option.recommended
+                };
+            })
+            .filter(Boolean);
+
+        if (options.length === 0) return null;
+
+        const selectionMode = choiceData.selection_mode === 'multi' ? 'multi' : 'single';
+        let autoSubmitSeconds = null;
+        if (typeof choiceData.auto_submit_seconds === 'number' && choiceData.auto_submit_seconds > 0) {
+            autoSubmitSeconds = Math.floor(choiceData.auto_submit_seconds);
+        }
+
+        return {
+            options: options,
+            selection_mode: selectionMode,
+            auto_submit_seconds: autoSubmitSeconds
+        };
+    };
+
+    /**
+     * 更新選項資料（可選擇保留當前選擇）
+     */
+    FeedbackApp.prototype.updateChoiceData = function(choiceData, preserveSelection) {
+        const normalized = this.normalizeChoiceData(choiceData);
+        this.choiceData = normalized;
+
+        if (!normalized) {
+            this.resetChoiceSelectionToDefault(true);
+            this.renderChoicePanel();
+            return;
+        }
+
+        if (!preserveSelection) {
+            this.resetChoiceSelectionToDefault(true);
+        } else if (
+            !this.choiceSelection ||
+            !Array.isArray(this.choiceSelection.selected_ids) ||
+            this.choiceSelection.selected_ids.length === 0
+        ) {
+            this.resetChoiceSelectionToDefault(true);
+        }
+
+        this.renderChoicePanel();
+    };
+
+    /**
+     * 重置選項選擇為推薦預設
+     */
+    FeedbackApp.prototype.resetChoiceSelectionToDefault = function(forceReset) {
+        if (!this.choiceData) {
+            this.choiceSelection = { selected_ids: [], option_annotations: {} };
+            this.choiceOptionMap = {};
+            return;
+        }
+
+        if (!forceReset && this.choiceSelection && this.choiceSelection.selected_ids.length > 0) {
+            return;
+        }
+
+        const recommendedIds = this.choiceData.options
+            .filter(function(option) { return option.recommended; })
+            .map(function(option) { return option.id; });
+
+        if (this.choiceData.selection_mode === 'single') {
+            this.choiceSelection = {
+                selected_ids: recommendedIds.length > 0 ? [recommendedIds[0]] : [],
+                option_annotations: {}
+            };
+        } else {
+            this.choiceSelection = {
+                selected_ids: recommendedIds.slice(),
+                option_annotations: {}
+            };
+        }
+    };
+
+    /**
+     * 渲染選項面板
+     */
+    FeedbackApp.prototype.renderChoicePanel = function() {
+        const panel = document.getElementById('choicePanel');
+        if (!panel) return;
+
+        if (!this.choiceData) {
+            panel.style.display = 'none';
+            if (this.choiceAutoSubmitManager) {
+                this.choiceAutoSubmitManager.stop();
+            }
+            return;
+        }
+
+        panel.style.display = 'block';
+
+        const modeLabel = document.getElementById('choiceModeLabel');
+        if (modeLabel) {
+            const modeText = this.choiceData.selection_mode === 'multi'
+                ? (window.i18nManager ? window.i18nManager.t('choices.mode.multi', '多選') : '多選')
+                : (window.i18nManager ? window.i18nManager.t('choices.mode.single', '單選') : '單選');
+            modeLabel.textContent = modeText;
+        }
+
+        const optionsContainer = document.getElementById('choiceOptions');
+        if (!optionsContainer) return;
+
+        optionsContainer.innerHTML = '';
+        this.resetChoiceSelectionToDefault(false);
+
+        const inputType = this.choiceData.selection_mode === 'multi' ? 'checkbox' : 'radio';
+        const name = 'choiceOption';
+        const selectedSet = new Set(this.choiceSelection.selected_ids || []);
+
+        this.choiceOptionMap = {};
+
+        this.choiceData.options.forEach(function(option) {
+            const wrapper = document.createElement('div');
+            wrapper.className = 'choice-option' + (option.recommended ? ' recommended' : '');
+
+            const input = document.createElement('input');
+            input.type = inputType;
+            input.name = name;
+            input.value = option.id;
+            input.checked = selectedSet.has(option.id);
+
+            const content = document.createElement('div');
+            content.className = 'choice-option-content';
+
+            const title = document.createElement('div');
+            title.className = 'choice-option-title';
+            title.textContent = option.id;
+
+            if (option.recommended) {
+                const badge = document.createElement('span');
+                badge.className = 'choice-recommended-badge';
+                badge.textContent = window.i18nManager ? window.i18nManager.t('choices.recommended', '推薦') : '推薦';
+                title.appendChild(badge);
+            }
+
+            const desc = document.createElement('div');
+            desc.className = 'choice-option-desc';
+            desc.textContent = option.description;
+
+            content.appendChild(title);
+            content.appendChild(desc);
+
+            wrapper.appendChild(input);
+            wrapper.appendChild(content);
+
+            optionsContainer.appendChild(wrapper);
+
+            wrapper.addEventListener('click', function(event) {
+                if (event.target === input) return;
+                input.click();
+            });
+        });
+
+        const self = this;
+        this.choiceOptionMap = this.choiceData.options.reduce(function(acc, option) {
+            acc[option.id] = option;
+            return acc;
+        }, {});
+
+        const inputs = optionsContainer.querySelectorAll('input[name="choiceOption"]');
+        inputs.forEach(function(input) {
+            input.addEventListener('change', function() {
+                self.handleChoiceSelectionChange();
+            });
+        });
+
+        this.handleChoiceSelectionChange();
+        this.startChoiceAutoSubmitIfNeeded();
+    };
+
+    /**
+     * 處理選項選擇變更
+     */
+    FeedbackApp.prototype.handleChoiceSelectionChange = function() {
+        if (!this.choiceData) return;
+
+        const inputs = document.querySelectorAll('input[name="choiceOption"]');
+        const selectedIds = [];
+        inputs.forEach(function(input) {
+            if (input.checked) {
+                selectedIds.push(input.value);
+            }
+        });
+
+        this.choiceSelection.selected_ids = selectedIds;
+
+        // 清理未選項目的註記
+        const nextAnnotations = {};
+        selectedIds.forEach(function(optionId) {
+            if (this.choiceSelection.option_annotations && this.choiceSelection.option_annotations[optionId]) {
+                nextAnnotations[optionId] = this.choiceSelection.option_annotations[optionId];
+            }
+        }, this);
+        this.choiceSelection.option_annotations = nextAnnotations;
+
+        this.renderChoiceAnnotations();
+    };
+
+    /**
+     * 渲染已選項註記輸入
+     */
+    FeedbackApp.prototype.renderChoiceAnnotations = function() {
+        const container = document.getElementById('choiceAnnotations');
+        const list = document.getElementById('choiceAnnotationsList');
+        if (!container || !list) return;
+
+        const selectedIds = this.choiceSelection.selected_ids || [];
+        if (!selectedIds.length) {
+            container.style.display = 'none';
+            list.innerHTML = '';
+            return;
+        }
+
+        container.style.display = 'block';
+        list.innerHTML = '';
+
+        const placeholder = window.i18nManager
+            ? window.i18nManager.t('choices.annotationPlaceholder', '為該選項補充說明...')
+            : '為該選項補充說明...';
+
+        const self = this;
+
+        selectedIds.forEach(function(optionId) {
+            const option = self.choiceOptionMap ? self.choiceOptionMap[optionId] : null;
+
+            const item = document.createElement('div');
+            item.className = 'choice-annotation-item';
+
+            const label = document.createElement('div');
+            label.className = 'choice-annotation-label';
+            const labelText = window.i18nManager
+                ? window.i18nManager.t('choices.annotationLabel', { id: optionId })
+                : '選項 ' + optionId + ' 註記';
+            label.textContent = labelText;
+
+            const textarea = document.createElement('textarea');
+            textarea.className = 'choice-annotation-input';
+            textarea.setAttribute('data-option-id', optionId);
+            textarea.placeholder = placeholder;
+            textarea.value = (self.choiceSelection.option_annotations && self.choiceSelection.option_annotations[optionId]) || '';
+
+            textarea.addEventListener('input', function() {
+                const value = textarea.value.trim();
+                if (!value) {
+                    delete self.choiceSelection.option_annotations[optionId];
+                } else {
+                    self.choiceSelection.option_annotations[optionId] = value;
+                }
+            });
+
+            item.appendChild(label);
+            if (option && option.description) {
+                const desc = document.createElement('div');
+                desc.className = 'choice-option-desc';
+                desc.textContent = option.description;
+                item.appendChild(desc);
+            }
+            item.appendChild(textarea);
+            list.appendChild(item);
+        });
+    };
+
+    /**
+     * 取得選項選擇結果
+     */
+    FeedbackApp.prototype.getChoiceResult = function(autoSubmitted) {
+        if (!this.choiceData) return null;
+
+        const selectedIds = Array.isArray(this.choiceSelection.selected_ids)
+            ? this.choiceSelection.selected_ids.slice()
+            : [];
+
+        const annotations = {};
+        if (this.choiceSelection.option_annotations) {
+            Object.keys(this.choiceSelection.option_annotations).forEach(function(optionId) {
+                if (selectedIds.includes(optionId)) {
+                    const note = String(this.choiceSelection.option_annotations[optionId] || '').trim();
+                    if (note) {
+                        annotations[optionId] = note;
+                    }
+                }
+            }, this);
+        }
+
+        const recommendedIds = this.choiceData.options
+            .filter(function(option) { return option.recommended; })
+            .map(function(option) { return option.id; });
+
+        const recommendedSelected = selectedIds.filter(function(optionId) {
+            return recommendedIds.includes(optionId);
+        });
+
+        return {
+            selection_mode: this.choiceData.selection_mode,
+            selected_ids: selectedIds,
+            option_annotations: annotations,
+            recommended_ids: recommendedIds,
+            recommended_selected_ids: recommendedSelected,
+            auto_submitted: !!autoSubmitted
+        };
+    };
+
+    /**
+     * 初始化選項自動提交倒數
+     */
+    FeedbackApp.prototype.setupChoiceAutoSubmitManager = function() {
+        const self = this;
+        this.choiceAutoSubmitManager = {
+            countdown: null,
+            isEnabled: false,
+            start: function(timeoutSeconds) {
+                const timeUtils = window.MCPFeedback.Utils && window.MCPFeedback.Utils.Time;
+                if (!timeUtils || !timeUtils.createAutoSubmitCountdown) {
+                    console.warn('⚠️ TimeUtils 未載入，無法啟動選項自動提交倒數');
+                    return;
+                }
+
+                this.stop();
+                this.isEnabled = true;
+
+                self.showChoiceAutoSubmitDisplay();
+
+                this.countdown = timeUtils.createAutoSubmitCountdown(
+                    timeoutSeconds,
+                    function(remainingTime) {
+                        self.updateChoiceAutoSubmitTimer(remainingTime);
+                    },
+                    function() {
+                        self.performChoiceAutoSubmit();
+                    }
+                );
+
+                this.countdown.start();
+            },
+            stop: function() {
+                if (this.countdown) {
+                    this.countdown.stop();
+                    this.countdown = null;
+                }
+                this.isEnabled = false;
+                self.hideChoiceAutoSubmitDisplay();
+            }
+        };
+    };
+
+    /**
+     * 啟動選項自動提交（若已設定）
+     */
+    FeedbackApp.prototype.startChoiceAutoSubmitIfNeeded = function() {
+        if (!this.choiceData || !this.choiceAutoSubmitManager) return;
+
+        const timeoutSeconds = this.choiceData.auto_submit_seconds;
+        const currentState = this.uiManager ? this.uiManager.getFeedbackState() : null;
+        const isWaiting = currentState === window.MCPFeedback.Utils.CONSTANTS.FEEDBACK_WAITING;
+
+        if (timeoutSeconds && isWaiting) {
+            this.choiceAutoSubmitManager.start(timeoutSeconds);
+        } else {
+            this.choiceAutoSubmitManager.stop();
+        }
+    };
+
+    /**
+     * 執行選項自動提交
+     */
+    FeedbackApp.prototype.performChoiceAutoSubmit = function() {
+        console.log('⏰ 執行選項自動提交...');
+
+        const wsReady = this.webSocketManager && this.webSocketManager.isReady();
+        const feedbackState = this.uiManager ? this.uiManager.getFeedbackState() : null;
+        const isWaiting = feedbackState === window.MCPFeedback.Utils.CONSTANTS.FEEDBACK_WAITING;
+
+        if (!wsReady) {
+            const feedbackData = this.collectFeedbackData();
+            if (!feedbackData) return;
+            feedbackData.choice_result = this.getChoiceResult(true);
+            this.pendingSubmission = feedbackData;
+            const connectingMessage = window.i18nManager ?
+                window.i18nManager.t('feedback.connectingMessage') :
+                'WebSocket 連接中，回饋將在連接就緒後自動提交...';
+            window.MCPFeedback.Utils.showMessage(connectingMessage, window.MCPFeedback.Utils.CONSTANTS.MESSAGE_INFO);
+            return;
+        }
+
+        if (!isWaiting) {
+            this.handleSubmitError();
+            return;
+        }
+
+        const feedbackData = this.collectFeedbackData();
+        if (!feedbackData) return;
+        feedbackData.choice_result = this.getChoiceResult(true);
+
+        this.submitFeedbackInternal(feedbackData, { source: 'choice', autoSubmitted: true });
+    };
+
+    /**
+     * 更新選項倒數顯示
+     */
+    FeedbackApp.prototype.updateChoiceAutoSubmitTimer = function(remainingSeconds) {
+        const timer = document.getElementById('choiceAutoSubmitTimer');
+        if (!timer) return;
+
+        const timeUtils = window.MCPFeedback.Utils && window.MCPFeedback.Utils.Time;
+        const formatted = timeUtils && timeUtils.formatAutoSubmitCountdown
+            ? timeUtils.formatAutoSubmitCountdown(remainingSeconds)
+            : remainingSeconds;
+        timer.textContent = formatted;
+    };
+
+    FeedbackApp.prototype.showChoiceAutoSubmitDisplay = function() {
+        const display = document.getElementById('choiceAutoSubmit');
+        if (display) {
+            display.style.display = 'inline-flex';
+        }
+    };
+
+    FeedbackApp.prototype.hideChoiceAutoSubmitDisplay = function() {
+        const display = document.getElementById('choiceAutoSubmit');
+        if (display) {
+            display.style.display = 'none';
+        }
     };
 
     /**
@@ -1797,6 +2345,9 @@
                         }
                     }
                 }
+
+                // 更新選項資料（保留當前選擇）
+                self.updateChoiceData(sessionData.choice_data, true);
 
                 // 更新頁面標題
                 if (sessionData.project_directory) {

@@ -23,6 +23,7 @@
         "sessions": "📋 會話管理",
         "settings": "⚙️ 設定",
         "combined": "📝 工作區",
+        "detailedStats": "📊 詳細統計資訊",
         "about": "ℹ️ 關於"
     },
     "feedback": {
@@ -56,7 +57,7 @@
         "noContent": "沒有可複製的內容",
         "copySuccess": "內容已複製到剪貼板",
         "copyFailed": "複製失敗",
-        "provideTextOrImage": "請提供回饋文字或上傳圖片",
+        "provideTextOrImage": "請提供回饋文字、上傳圖片或選擇選項",
         "lastFeedback": {
             "title": "上次反饋",
             "copy": "複製內容",
@@ -68,6 +69,18 @@
             "loaded": "已載入到輸入框",
             "imagesAttached": "張圖片"
         }
+    },
+    "choices": {
+        "title": "🎯 選項選擇",
+        "mode": {
+            "single": "單選",
+            "multi": "多選"
+        },
+        "recommended": "推薦",
+        "autoSubmitLabel": "自動推薦倒數:",
+        "annotationsTitle": "已選項註記",
+        "annotationPlaceholder": "為該選項補充說明...",
+        "annotationLabel": "選項 {id} 註記"
     },
     "summary": {
         "title": "📋 AI 工作摘要",
@@ -146,6 +159,11 @@
         "theme": "主題",
         "notifications": "通知",
         "advanced": "🔧 進階設定",
+        "defaultChoiceFallbackTitle": "選項兜底",
+        "defaultChoiceFallbackDesc": "僅當摘要包含 [choices] 或 [[ask_choice]] 時，自動生成預設選項",
+        "defaultChoiceFallbackOptionsTitle": "兜底選項內容",
+        "defaultChoiceFallbackOptionsDesc": "JSON 陣列，每項包含 id/description/recommended",
+        "defaultChoiceFallbackInvalid": "選項格式有誤，請輸入有效 JSON",
         "save": "儲存設定",
         "reset": "重置設定",
         "resetDesc": "清除所有已保存的設定，恢復到預設狀態",

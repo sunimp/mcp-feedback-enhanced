@@ -18,6 +18,7 @@
         "sessions": "📋 会话管理",
         "settings": "⚙️ 设置",
         "combined": "📝 工作区",
+        "detailedStats": "📊 详细统计信息",
         "about": "ℹ️ 关于"
     },
     "feedback": {
@@ -51,7 +52,7 @@
         "noContent": "没有可复制的内容",
         "copySuccess": "内容已复制到剪贴板",
         "copyFailed": "复制失败",
-        "provideTextOrImage": "请提供反馈文字或上传图片",
+        "provideTextOrImage": "请提供反馈文字、上传图片或选择选项",
         "lastFeedback": {
             "title": "上次反馈",
             "copy": "复制内容",
@@ -63,6 +64,18 @@
             "loaded": "已载入到输入框",
             "imagesAttached": "张图片"
         }
+    },
+    "choices": {
+        "title": "🎯 选项选择",
+        "mode": {
+            "single": "单选",
+            "multi": "多选"
+        },
+        "recommended": "推荐",
+        "autoSubmitLabel": "自动推荐倒数:",
+        "annotationsTitle": "已选项注释",
+        "annotationPlaceholder": "为该选项补充说明...",
+        "annotationLabel": "选项 {id} 注释"
     },
     "summary": {
         "title": "📋 AI 工作摘要",
@@ -141,6 +154,11 @@
         "theme": "主题",
         "notifications": "通知",
         "advanced": "🔧 进阶设定",
+        "defaultChoiceFallbackTitle": "选项兜底",
+        "defaultChoiceFallbackDesc": "仅当摘要包含 [choices] 或 [[ask_choice]] 时，自动生成默认选项",
+        "defaultChoiceFallbackOptionsTitle": "兜底选项内容",
+        "defaultChoiceFallbackOptionsDesc": "JSON 数组，每项包含 id/description/recommended",
+        "defaultChoiceFallbackInvalid": "选项格式有误，请输入有效 JSON",
         "save": "储存设定",
         "reset": "重置设定",
         "resetDesc": "清除所有已保存的设定，恢复到预设状态",

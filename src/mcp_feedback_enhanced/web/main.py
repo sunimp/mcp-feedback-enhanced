@@ -326,7 +326,9 @@ class WebUIManager:
         else:
             raise RuntimeError(f"Templates directory not found: {web_templates_path}")
 
-    def create_session(self, project_directory: str, summary: str) -> str:
+    def create_session(
+        self, project_directory: str, summary: str, choice_data: dict[str, Any] | None = None
+    ) -> str:
         """創建新的回饋會話 - 重構為單一活躍會話模式，保留標籤頁狀態"""
         # 保存舊會話的引用和 WebSocket 連接
         old_session = self.current_session
@@ -337,7 +339,9 @@ class WebUIManager:
 
         # 創建新會話
         session_id = str(uuid.uuid4())
-        session = WebFeedbackSession(session_id, project_directory, summary)
+        session = WebFeedbackSession(
+            session_id, project_directory, summary, choice_data=choice_data
+        )
 
         # 如果有舊會話，處理狀態轉換和清理
         if old_session:
@@ -1097,7 +1101,10 @@ def get_web_ui_manager() -> WebUIManager:
 
 
 async def launch_web_feedback_ui(
-    project_directory: str, summary: str, timeout: int = 600
+    project_directory: str,
+    summary: str,
+    timeout: int = 600,
+    choice_data: dict[str, Any] | None = None,
 ) -> dict:
     """
     啟動 Web 回饋介面並等待用戶回饋 - 重構為使用根路徑
@@ -1113,7 +1120,7 @@ async def launch_web_feedback_ui(
     manager = get_web_ui_manager()
 
     # 創建新會話（每次AI調用都應該創建新會話）
-    manager.create_session(project_directory, summary)
+    manager.create_session(project_directory, summary, choice_data)
     session = manager.get_current_session()
 
     if not session:

@@ -81,10 +81,12 @@ def setup_routes(manager: "WebUIManager"):
                 "request": request,
                 "project_directory": current_session.project_directory,
                 "summary": current_session.summary,
+                "session_id": current_session.session_id,
                 "title": "Interactive Feedback - 回饋收集",
                 "version": __version__,
                 "has_session": True,
                 "layout_mode": layout_mode,
+                "choice_data": current_session.choice_data,
             },
         )
 
@@ -174,6 +176,7 @@ def setup_routes(manager: "WebUIManager"):
                 "feedback_completed": current_session.feedback_completed.is_set(),
                 "command_logs": current_session.command_logs,
                 "images_count": len(current_session.images),
+                "choice_data": current_session.choice_data,
             }
         )
 
@@ -297,6 +300,7 @@ def setup_routes(manager: "WebUIManager"):
                             "project_directory": session.project_directory,
                             "summary": session.summary,
                             "session_id": session.session_id,
+                            "choice_data": session.choice_data,
                         },
                     }
                 )
@@ -624,7 +628,8 @@ async def handle_websocket_message(manager: "WebUIManager", session, data: dict)
         feedback = data.get("feedback", "")
         images = data.get("images", [])
         settings = data.get("settings", {})
-        await session.submit_feedback(feedback, images, settings)
+        choice_result = data.get("choice_result")
+        await session.submit_feedback(feedback, images, settings, choice_result)
 
     elif message_type == "run_command":
         # 執行命令

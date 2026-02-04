@@ -18,6 +18,7 @@
         "sessions": "📋 Session Management",
         "settings": "⚙️ Settings",
         "combined": "📝 Workspace",
+        "detailedStats": "📊 Detailed Statistics",
         "about": "ℹ️ About"
     },
     "feedback": {
@@ -51,7 +52,7 @@
         "noContent": "No content to copy",
         "copySuccess": "Content copied to clipboard",
         "copyFailed": "Failed to copy",
-        "provideTextOrImage": "Please provide feedback text or upload an image",
+        "provideTextOrImage": "Please provide feedback text, upload an image, or select an option",
         "lastFeedback": {
             "title": "Last Feedback",
             "copy": "Copy content",
@@ -63,6 +64,18 @@
             "loaded": "Loaded to input",
             "imagesAttached": "image(s)"
         }
+    },
+    "choices": {
+        "title": "🎯 Choices",
+        "mode": {
+            "single": "Single select",
+            "multi": "Multi select"
+        },
+        "recommended": "Recommended",
+        "autoSubmitLabel": "Auto-submit countdown:",
+        "annotationsTitle": "Selected Annotations",
+        "annotationPlaceholder": "Add a note for this option...",
+        "annotationLabel": "Option {id} note"
     },
     "summary": {
         "title": "📋 AI Work Summary",
@@ -141,6 +154,11 @@
         "theme": "Theme",
         "notifications": "Notifications",
         "advanced": "🔧 Advanced Settings",
+        "defaultChoiceFallbackTitle": "Default Choices Fallback",
+        "defaultChoiceFallbackDesc": "Only auto-generate default options when summary contains [choices] or [[ask_choice]]",
+        "defaultChoiceFallbackOptionsTitle": "Fallback Options Content",
+        "defaultChoiceFallbackOptionsDesc": "JSON array, each item has id/description/recommended",
+        "defaultChoiceFallbackInvalid": "Invalid options format, please provide valid JSON",
         "save": "Save Settings",
         "reset": "Reset Settings",
         "resetDesc": "Clear all saved settings and restore to default state",

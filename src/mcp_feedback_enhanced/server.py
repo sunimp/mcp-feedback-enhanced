@@ -28,7 +28,9 @@ import io
 import json
 import os
 import sys
+from pathlib import Path
 from typing import Annotated, Any
+from datetime import datetime
 
 from fastmcp import FastMCP
 from fastmcp.utilities.types import Image as MCPImage
@@ -264,6 +266,213 @@ def save_feedback_to_file(feedback_data: dict, file_path: str | None = None) -> 
     return file_path
 
 
+def normalize_choice_payload(
+    choices: list[dict] | None, choice_config: dict | None
+) -> dict[str, Any] | None:
+    """
+    正規化選項資料，避免前端渲染與資料結構不一致
+
+    Args:
+        choices: 選項列表（每項包含 id/description/recommended）
+        choice_config: 選項配置（selection_mode, auto_submit_seconds）
+
+    Returns:
+        dict | None: 正規化後的選項資料
+    """
+    if not choices:
+        return None
+
+    # 兼容 choices 為 dict 且內含 options/choices/items 的情況
+    if isinstance(choices, dict):
+        nested = (
+            choices.get("options")
+            or choices.get("choices")
+            or choices.get("items")
+            or choices.get("data")
+        )
+        if isinstance(nested, list):
+            choices = nested
+        else:
+            return None
+
+    options: list[dict[str, Any]] = []
+    for raw in choices:
+        option_id = ""
+        description = ""
+        recommended = False
+
+        if isinstance(raw, dict):
+            option_id = str(
+                raw.get("id")
+                or raw.get("value")
+                or raw.get("key")
+                or raw.get("name")
+                or ""
+            ).strip()
+            description = str(
+                raw.get("description")
+                or raw.get("label")
+                or raw.get("text")
+                or raw.get("title")
+                or raw.get("name")
+                or raw.get("value")
+                or ""
+            ).strip()
+            recommended = bool(
+                raw.get("recommended")
+                or raw.get("isRecommended")
+                or raw.get("default")
+                or raw.get("selected")
+            )
+        elif isinstance(raw, (str, int, float)):
+            option_id = str(raw).strip()
+            description = option_id
+        else:
+            continue
+
+        if not option_id and description:
+            option_id = description
+        if not description and option_id:
+            description = option_id
+        if not option_id or not description:
+            continue
+
+        options.append(
+            {
+                "id": option_id,
+                "description": description,
+                "recommended": recommended,
+            }
+        )
+
+    if not options:
+        return None
+
+    # 兼容 choice_config 嵌套在 choices/config 的情況
+    if isinstance(choices, dict) and not choice_config:
+        embedded_config = choices.get("config") or choices.get("choice_config")
+        if isinstance(embedded_config, dict):
+            choice_config = embedded_config
+
+    normalized_config = choice_config or {}
+    # 兼容不同命名風格
+    if "selection_mode" not in normalized_config and "selectionMode" in normalized_config:
+        normalized_config["selection_mode"] = normalized_config.get("selectionMode")
+    if "auto_submit_seconds" not in normalized_config and "autoSubmitSeconds" in normalized_config:
+        normalized_config["auto_submit_seconds"] = normalized_config.get("autoSubmitSeconds")
+
+    selection_mode = str(normalized_config.get("selection_mode", "single")).lower()
+    if selection_mode in ("multiple", "multi_select", "multi-choice", "multi_choice", "checkbox", "checks"):
+        selection_mode = "multi"
+    if selection_mode not in ("single", "multi"):
+        selection_mode = "single"
+
+    auto_submit_seconds = normalized_config.get("auto_submit_seconds")
+    if isinstance(auto_submit_seconds, float):
+        auto_submit_seconds = int(auto_submit_seconds)
+    if not isinstance(auto_submit_seconds, int) or auto_submit_seconds <= 0:
+        auto_submit_seconds = None
+
+    payload = {
+        "options": options,
+        "selection_mode": selection_mode,
+        "auto_submit_seconds": auto_submit_seconds,
+    }
+    return payload
+
+
+def write_choice_debug_log(
+    choices: Any,
+    choice_config: Any,
+    options: Any,
+    config: Any,
+    choice_payload: dict[str, Any] | None,
+    fallback_used: bool = False,
+) -> None:
+    """將選項處理結果寫入本地檔案，避免依賴 MCP_DEBUG。"""
+    log_path = "/tmp/mcp-feedback-enhanced-choice-debug.log"
+    try:
+        record = {
+            "ts": datetime.utcnow().isoformat() + "Z",
+            "choices_type": type(choices).__name__,
+            "choice_config_type": type(choice_config).__name__,
+            "options_type": type(options).__name__,
+            "config_type": type(config).__name__,
+            "choices_preview": choices,
+            "choice_config_preview": choice_config,
+            "options_preview": options,
+            "config_preview": config,
+            "choice_payload": choice_payload,
+            "fallback_used": fallback_used,
+        }
+        with open(log_path, "a", encoding="utf-8") as f:
+            f.write(json.dumps(record, ensure_ascii=False, default=str) + "\n")
+    except Exception:
+        # 避免影響主流程
+        pass
+
+
+def load_ui_settings() -> dict[str, Any]:
+    """讀取 UI 設定檔（若不存在則回傳空 dict）。"""
+    try:
+        settings_file = (
+            Path.home() / ".config" / "mcp-feedback-enhanced" / "ui_settings.json"
+        )
+        if settings_file.exists():
+            with open(settings_file, encoding="utf-8") as f:
+                data = json.load(f)
+                if isinstance(data, dict):
+                    return data
+    except Exception:
+        pass
+    return {}
+
+
+def build_default_choice_payload(
+    settings: dict[str, Any], summary: str
+) -> dict[str, Any] | None:
+    """根據設定生成預設選項兜底。"""
+    if settings.get("defaultChoiceFallbackEnabled", True) is False:
+        return None
+
+    # 只在摘要包含標記時啟用兜底選項
+    marker_tokens = ("[choices]", "[[ask_choice]]")
+    if not any(token in (summary or "") for token in marker_tokens):
+        return None
+
+    fallback_options = settings.get("defaultChoiceFallbackOptions")
+    if isinstance(fallback_options, list) and len(fallback_options) > 0:
+        payload = normalize_choice_payload(
+            fallback_options, {"selection_mode": "single", "auto_submit_seconds": None}
+        )
+        if payload:
+            return payload
+
+    language = str(settings.get("language", "")).lower()
+    if language.startswith("zh-tw") or language.startswith("zh_hk") or language.startswith("zh-hk"):
+        fallback_choices = [
+            {"id": "完成", "description": "已完成或已確認", "recommended": True},
+            {"id": "需調整", "description": "需要修改或再優化", "recommended": False},
+            {"id": "無法判斷", "description": "無法判斷或未復現", "recommended": False},
+        ]
+    elif language.startswith("zh"):
+        fallback_choices = [
+            {"id": "完成", "description": "已完成或已确认", "recommended": True},
+            {"id": "需调整", "description": "需要修改或再优化", "recommended": False},
+            {"id": "无法判断", "description": "无法判断或未复现", "recommended": False},
+        ]
+    else:
+        fallback_choices = [
+            {"id": "Done", "description": "Completed or confirmed", "recommended": True},
+            {"id": "Needs Changes", "description": "Requires adjustments", "recommended": False},
+            {"id": "Unclear", "description": "Unclear or not reproducible", "recommended": False},
+        ]
+
+    return normalize_choice_payload(
+        fallback_choices, {"selection_mode": "single", "auto_submit_seconds": None}
+    )
+
+
 def create_feedback_text(feedback_data: dict) -> str:
     """
     建立格式化的回饋文字
@@ -283,6 +492,37 @@ def create_feedback_text(feedback_data: dict) -> str:
     # 命令執行日誌
     if feedback_data.get("command_logs"):
         text_parts.append(f"=== 命令執行日誌 ===\n{feedback_data['command_logs']}")
+
+    # 選項選擇結果
+    choice_result = feedback_data.get("choice_result")
+    if isinstance(choice_result, dict):
+        selection_mode = choice_result.get("selection_mode") or "single"
+        selected_ids = choice_result.get("selected_ids") or []
+        option_annotations = choice_result.get("option_annotations") or {}
+        recommended_selected = choice_result.get("recommended_selected_ids") or []
+        auto_submitted = bool(choice_result.get("auto_submitted"))
+
+        mode_label = "單選" if selection_mode == "single" else "多選"
+        text_parts.append(f"=== 選項選擇 ===\n模式: {mode_label}")
+
+        if selected_ids:
+            text_parts.append(f"已選: {', '.join(selected_ids)}")
+        else:
+            text_parts.append("已選: （未選擇任何選項）")
+
+        if recommended_selected:
+            text_parts.append(f"推薦已選: {', '.join(recommended_selected)}")
+
+        if option_annotations:
+            lines = ["選項註記:"]
+            for option_id, note in option_annotations.items():
+                if note:
+                    lines.append(f"- {option_id}: {note}")
+            if len(lines) > 1:
+                text_parts.append("\n".join(lines))
+
+        if auto_submitted:
+            text_parts.append("提交方式: 自動推薦超時提交")
 
     # 圖片附件概要
     if feedback_data.get("images"):
@@ -442,6 +682,25 @@ async def interactive_feedback(
         str, Field(description="AI 工作完成的摘要說明")
     ] = "我已完成了您請求的任務。",
     timeout: Annotated[int, Field(description="等待用戶回饋的超時時間（秒）")] = 2400,
+    choices: Annotated[
+        list[dict] | None, Field(description="可選的選項列表（id, description, recommended）")
+    ] = None,
+    choice_config: Annotated[
+        dict | None,
+        Field(
+            description="選項配置（selection_mode: single/multi, auto_submit_seconds: int）"
+        ),
+    ] = None,
+    options: Annotated[
+        list[dict] | None,
+        Field(description="兼容參數：同 choices（id, description, recommended）"),
+    ] = None,
+    config: Annotated[
+        dict | None,
+        Field(
+            description="兼容參數：同 choice_config（selection_mode / auto_submit_seconds 或 selectionMode / autoSubmitSeconds）"
+        ),
+    ] = None,
 ) -> list:
     """Interactive feedback collection tool for LLM agents.
 
@@ -456,6 +715,10 @@ async def interactive_feedback(
         project_directory: Project directory path for context
         summary: Summary of AI work completed for user review
         timeout: Timeout in seconds for waiting user feedback (default: 600 seconds)
+        choices: Choice options for selection (optional)
+        choice_config: Choice configuration for selection mode and auto submit (optional)
+        options: Compatibility alias for choices (optional)
+        config: Compatibility alias for choice_config (optional)
 
     Returns:
         list: List containing TextContent and ImageContent objects representing user feedback
@@ -476,7 +739,53 @@ async def interactive_feedback(
         # 使用 Web 模式
         debug_log("回饋模式: web")
 
-        result = await launch_web_feedback_ui(project_directory, summary, timeout)
+        # 兼容舊參數命名
+        if not choices and options:
+            choices = options
+        if not choice_config and config:
+            choice_config = config
+
+        choice_payload = normalize_choice_payload(choices, choice_config)
+
+        fallback_used = False
+        if not choice_payload:
+            settings = load_ui_settings()
+            fallback_payload = build_default_choice_payload(settings, summary)
+            if fallback_payload:
+                choice_payload = fallback_payload
+                fallback_used = True
+
+        write_choice_debug_log(
+            choices=choices,
+            choice_config=choice_config,
+            options=options,
+            config=config,
+            choice_payload=choice_payload,
+            fallback_used=fallback_used,
+        )
+        try:
+            option_count = (
+                len(choice_payload.get("options", [])) if choice_payload else 0
+            )
+            debug_log(
+                "選項資料處理結果: "
+                f"choices={'有' if choices else '無'}, "
+                f"choice_config={'有' if choice_config else '無'}, "
+                f"payload={'有' if choice_payload else '無'}, "
+                f"options={option_count}"
+            )
+            if choice_payload:
+                debug_log(
+                    "選項資料摘要: "
+                    f"selection_mode={choice_payload.get('selection_mode')}, "
+                    f"auto_submit_seconds={choice_payload.get('auto_submit_seconds')}"
+                )
+        except Exception:
+            debug_log("選項資料處理結果: 解析摘要失敗")
+
+        result = await launch_web_feedback_ui(
+            project_directory, summary, timeout, choice_payload
+        )
 
         # 處理取消情況
         if not result:
@@ -493,6 +802,7 @@ async def interactive_feedback(
             result.get("interactive_feedback")
             or result.get("command_logs")
             or result.get("images")
+            or result.get("choice_result")
         ):
             feedback_text = create_feedback_text(result)
             feedback_items.append(TextContent(type="text", text=feedback_text))
@@ -529,7 +839,12 @@ async def interactive_feedback(
         return [TextContent(type="text", text=user_error_msg)]
 
 
-async def launch_web_feedback_ui(project_dir: str, summary: str, timeout: int) -> dict:
+async def launch_web_feedback_ui(
+    project_dir: str,
+    summary: str,
+    timeout: int,
+    choice_payload: dict[str, Any] | None = None,
+) -> dict:
     """
     啟動 Web UI 收集回饋，支援自訂超時時間
 
@@ -548,7 +863,7 @@ async def launch_web_feedback_ui(project_dir: str, summary: str, timeout: int) -
         from .web import launch_web_feedback_ui as web_launch
 
         # 傳遞 timeout 參數給 Web UI
-        return await web_launch(project_dir, summary, timeout)
+        return await web_launch(project_dir, summary, timeout, choice_payload)
     except ImportError as e:
         # 使用統一錯誤處理
         error_id = ErrorHandler.log_error_with_context(

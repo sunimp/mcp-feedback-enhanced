@@ -112,6 +112,17 @@
     will-change: transform;
 }
 
+.stats-panel-tab {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.stats-panel-tab .stats-panel-header {
+    cursor: default;
+}
+
 /* 收起狀態 */
 .stats-panel-floating.collapsed {
     transform: translateY(calc(100% - 40px));
@@ -931,6 +942,150 @@ body {
     width: 100%;
 }
 
+/* ===== 選項選擇樣式 ===== */
+.choice-panel {
+    margin: 12px 0 16px 0;
+    padding: 14px 16px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+}
+
+.choice-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 12px;
+}
+
+.choice-title h4 {
+    margin: 0;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.choice-meta {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.choice-mode {
+    font-size: 12px;
+    color: var(--text-secondary);
+    padding: 2px 8px;
+    border: 1px solid var(--border-color);
+    border-radius: 999px;
+    background: var(--bg-tertiary);
+}
+
+.choice-auto-submit {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    color: var(--text-secondary);
+}
+
+.choice-auto-submit-timer {
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.choice-options {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.choice-option {
+    display: flex;
+    gap: 10px;
+    padding: 10px 12px;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    background: var(--bg-primary);
+    align-items: flex-start;
+    cursor: pointer;
+}
+
+.choice-option.recommended {
+    border-color: var(--accent-color);
+    box-shadow: 0 0 0 1px rgba(88, 166, 255, 0.1);
+}
+
+.choice-option input[type="radio"],
+.choice-option input[type="checkbox"] {
+    margin-top: 2px;
+    cursor: pointer;
+}
+
+.choice-option-content {
+    flex: 1;
+}
+
+.choice-option-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.choice-option-desc {
+    margin-top: 4px;
+    font-size: 12px;
+    color: var(--text-secondary);
+    line-height: 1.4;
+}
+
+.choice-recommended-badge {
+    font-size: 11px;
+    color: var(--accent-color);
+    border: 1px solid var(--accent-color);
+    border-radius: 999px;
+    padding: 1px 6px;
+}
+
+.choice-annotations {
+    margin-top: 12px;
+}
+
+.choice-annotations-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.choice-annotation-item {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.choice-annotation-label {
+    font-size: 12px;
+    color: var(--text-secondary);
+}
+
+.choice-annotation-input {
+    width: 100%;
+    min-height: 60px;
+    background: var(--code-bg);
+    border: 1px solid var(--code-border);
+    border-radius: 4px;
+    padding: 8px 10px;
+    color: var(--text-primary);
+    font-size: 13px;
+    line-height: 1.4;
+    resize: vertical;
+    font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', 'JetBrains Mono', 'Consolas', monospace;
+}
+
 .input-label {
     display: block;
     font-weight: 500;
@@ -1101,7 +1256,7 @@ body {
     flex-direction: column;
     min-width: 0;
     min-height: 0; /* 允許內容自然收縮 */
-    padding: 0 0 12px 0;
+    padding: 0;
     overflow: hidden;
     height: 100%;
     transition: all 0.6s cubic-bezier(0.4, 0.0, 0.2, 1);
@@ -1186,6 +1341,7 @@ body {
     height: 100%;
     padding-left: 0;
     padding-right: 0;
+    padding-bottom: 0;
     background: var(--bg-primary);
     border: none;
 }
@@ -1197,7 +1353,7 @@ body {
     min-height: 0;
     overflow: hidden;
     height: 100%;
-    padding-bottom: 16px;
+    padding-bottom: 0;
     box-sizing: border-box;
 }
 
@@ -1221,6 +1377,10 @@ body {
     flex: 1;
     min-height: 0;
     overflow: hidden;
+}
+
+#tab-combined .combined-section:last-child .input-group:last-child {
+    margin-bottom: 0;
 }
 
 #tab-combined #combinedSummaryContent {

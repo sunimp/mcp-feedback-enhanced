@@ -14,3 +14,4 @@ class FeedbackResult(TypedDict):
     command_logs: str
     interactive_feedback: str
     images: list[dict]
+    choice_result: dict

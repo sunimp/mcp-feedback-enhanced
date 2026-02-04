@@ -25,6 +25,29 @@
         
         // 從 i18nManager 獲取當前語言作為預設值
         const defaultLanguage = window.i18nManager ? window.i18nManager.getCurrentLanguage() : 'zh-TW';
+
+        function getDefaultChoiceFallbackOptions(language) {
+            const lang = String(language || '').toLowerCase();
+            if (lang.startsWith('zh-tw') || lang.startsWith('zh-hk')) {
+                return [
+                    { id: '完成', description: '已完成或已確認', recommended: true },
+                    { id: '需調整', description: '需要修改或再優化', recommended: false },
+                    { id: '無法判斷', description: '無法判斷或未復現', recommended: false }
+                ];
+            }
+            if (lang.startsWith('zh')) {
+                return [
+                    { id: '完成', description: '已完成或已确认', recommended: true },
+                    { id: '需调整', description: '需要修改或再优化', recommended: false },
+                    { id: '无法判断', description: '无法判断或未复现', recommended: false }
+                ];
+            }
+            return [
+                { id: 'Done', description: 'Completed or confirmed', recommended: true },
+                { id: 'Needs Changes', description: 'Requires adjustments', recommended: false },
+                { id: 'Unclear', description: 'Unclear or not reproducible', recommended: false }
+            ];
+        }
         
         // 預設設定
         this.defaultSettings = {
@@ -57,7 +80,10 @@
             // 自動執行命令設定
             autoCommandEnabled: true,      // 是否啟用自動執行命令
             commandOnNewSession: '',       // 新會話建立時執行的命令
-            commandOnFeedbackSubmit: ''    // 提交回饋後執行的命令
+            commandOnFeedbackSubmit: '',   // 提交回饋後執行的命令
+            // 選項兜底設定
+            defaultChoiceFallbackEnabled: true,
+            defaultChoiceFallbackOptions: getDefaultChoiceFallbackOptions(defaultLanguage)
         };
         
         // 當前設定
@@ -85,6 +111,10 @@
                 .then(function(serverSettings) {
                     if (serverSettings && Object.keys(serverSettings).length > 0) {
                         self.currentSettings = self.mergeSettings(self.defaultSettings, serverSettings);
+                        self.currentSettings.defaultChoiceFallbackOptions =
+                            self.normalizeDefaultChoiceFallbackOptions(
+                                self.currentSettings.defaultChoiceFallbackOptions
+                            );
                         logger.info('從伺服器端載入設定成功:', self.currentSettings);
                     } else {
                         console.log('沒有找到設定，使用預設值');
@@ -427,6 +457,9 @@
         
         // 應用會話超時設定
         this.applySessionTimeoutSettings();
+
+        // 應用選項兜底設定
+        this.applyDefaultChoiceFallbackSettings();
     };
 
     /**
@@ -632,6 +665,56 @@
     };
 
     /**
+     * 應用選項兜底設定
+     */
+    SettingsManager.prototype.applyDefaultChoiceFallbackSettings = function() {
+        const toggle = Utils.safeQuerySelector('#defaultChoiceFallbackEnabled');
+        if (toggle) {
+            toggle.checked = this.currentSettings.defaultChoiceFallbackEnabled;
+        }
+        const textarea = Utils.safeQuerySelector('#defaultChoiceFallbackOptions');
+        if (textarea) {
+            textarea.value = this.stringifyDefaultChoiceFallbackOptions(
+                this.currentSettings.defaultChoiceFallbackOptions
+            );
+        }
+        console.log('選項兜底設定已應用到 UI:', {
+            enabled: this.currentSettings.defaultChoiceFallbackEnabled
+        });
+    };
+
+    SettingsManager.prototype.normalizeDefaultChoiceFallbackOptions = function(options) {
+        if (!Array.isArray(options)) return [];
+        return options
+            .map(function(option) {
+                if (!option) return null;
+                const id = String(option.id || '').trim();
+                const description = String(option.description || '').trim();
+                if (!id || !description) return null;
+                return { id: id, description: description, recommended: !!option.recommended };
+            })
+            .filter(Boolean);
+    };
+
+    SettingsManager.prototype.stringifyDefaultChoiceFallbackOptions = function(options) {
+        const normalized = this.normalizeDefaultChoiceFallbackOptions(options);
+        return JSON.stringify(normalized, null, 2);
+    };
+
+    /**
+     * 應用選項兜底設定
+     */
+    SettingsManager.prototype.applyDefaultChoiceFallbackSettings = function() {
+        const toggle = Utils.safeQuerySelector('#defaultChoiceFallbackEnabled');
+        if (toggle) {
+            toggle.checked = this.currentSettings.defaultChoiceFallbackEnabled;
+        }
+        console.log('選項兜底設定已應用到 UI:', {
+            enabled: this.currentSettings.defaultChoiceFallbackEnabled
+        });
+    };
+
+    /**
      * 更新隱私等級描述文字
      */
     SettingsManager.prototype.updatePrivacyLevelDescription = function(privacyLevel) {
@@ -757,6 +840,41 @@
                     self.triggerAutoSubmitStateChange(newValue);
                 } catch (error) {
                     Utils.showMessage(error.message, Utils.CONSTANTS.MESSAGE_ERROR);
+                }
+            });
+        }
+
+        // 選項兜底功能開關
+        const defaultChoiceFallbackEnabled = Utils.safeQuerySelector('#defaultChoiceFallbackEnabled');
+        if (defaultChoiceFallbackEnabled) {
+            defaultChoiceFallbackEnabled.addEventListener('change', function(e) {
+                const value = e.target.checked;
+                self.set('defaultChoiceFallbackEnabled', value);
+                console.log('選項兜底設定已更新:', value);
+            });
+        }
+
+        const defaultChoiceFallbackOptions = Utils.safeQuerySelector('#defaultChoiceFallbackOptions');
+        if (defaultChoiceFallbackOptions) {
+            defaultChoiceFallbackOptions.addEventListener('blur', function() {
+                const raw = defaultChoiceFallbackOptions.value || '[]';
+                try {
+                    const parsed = JSON.parse(raw);
+                    const normalized = self.normalizeDefaultChoiceFallbackOptions(parsed);
+                    if (!normalized.length) {
+                        throw new Error('empty');
+                    }
+                    self.set('defaultChoiceFallbackOptions', normalized);
+                    defaultChoiceFallbackOptions.value = self.stringifyDefaultChoiceFallbackOptions(normalized);
+                    console.log('選項兜底內容已更新:', normalized.length);
+                } catch (error) {
+                    const message = window.i18nManager
+                        ? window.i18nManager.t('settingsUI.defaultChoiceFallbackInvalid', '選項格式有誤，請輸入有效 JSON')
+                        : '選項格式有誤，請輸入有效 JSON';
+                    Utils.showMessage(message, Utils.CONSTANTS.MESSAGE_WARNING);
+                    defaultChoiceFallbackOptions.value = self.stringifyDefaultChoiceFallbackOptions(
+                        self.currentSettings.defaultChoiceFallbackOptions
+                    );
                 }
             });
         }

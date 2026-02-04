@@ -126,6 +126,7 @@ class WebFeedbackSession:
         summary: str,
         auto_cleanup_delay: int = 3600,
         max_idle_time: int = 1800,
+        choice_data: dict[str, Any] | None = None,
     ):
         self.session_id = session_id
         self.project_directory = project_directory
@@ -134,6 +135,8 @@ class WebFeedbackSession:
         self.feedback_result: str | None = None
         self.images: list[dict] = []
         self.settings: dict[str, Any] = {}  # 圖片設定
+        self.choice_data: dict[str, Any] | None = choice_data
+        self.choice_result: dict[str, Any] | None = None
         self.feedback_completed = threading.Event()
         self.process: subprocess.Popen | None = None
         self.command_logs: list[str] = []
@@ -294,6 +297,7 @@ class WebFeedbackSession:
             "project_directory": self.project_directory,
             "summary": self.summary,
             "session_id": self.session_id,
+            "choice_data": self.choice_data,
         }
 
     def is_active(self) -> bool:
@@ -500,6 +504,7 @@ class WebFeedbackSession:
                     "interactive_feedback": self.feedback_result or "",
                     "images": self.images,
                     "settings": self.settings,
+                    "choice_result": self.choice_result,
                 }
             # 超時了，立即清理資源
             debug_log(
@@ -521,6 +526,7 @@ class WebFeedbackSession:
         feedback: str,
         images: list[dict[str, Any]],
         settings: dict[str, Any] | None = None,
+        choice_result: dict[str, Any] | None = None,
     ):
         """
         提交回饋和圖片
@@ -534,6 +540,29 @@ class WebFeedbackSession:
         # 先設置設定，再處理圖片（因為處理圖片時需要用到設定）
         self.settings = settings or {}
         self.images = self._process_images(images)
+
+        # 選項結果整理（僅保留已選項目的註記）
+        if isinstance(choice_result, dict):
+            selected_ids_raw = choice_result.get("selected_ids") or []
+            if isinstance(selected_ids_raw, list):
+                selected_ids = [str(item) for item in selected_ids_raw if str(item)]
+            else:
+                selected_ids = []
+
+            option_annotations_raw = choice_result.get("option_annotations") or {}
+            filtered_annotations: dict[str, str] = {}
+            if isinstance(option_annotations_raw, dict):
+                for key, value in option_annotations_raw.items():
+                    option_id = str(key)
+                    note = str(value).strip()
+                    if option_id in selected_ids and note:
+                        filtered_annotations[option_id] = note
+
+            choice_result["selected_ids"] = selected_ids
+            choice_result["option_annotations"] = filtered_annotations
+            self.choice_result = choice_result
+        else:
+            self.choice_result = None
 
         # 進入下一步：等待中 → 已提交反饋
         self.next_step("已送出反饋，等待下次 MCP 調用")
